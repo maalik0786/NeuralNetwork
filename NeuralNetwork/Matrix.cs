@@ -3,188 +3,119 @@ using System.Threading.Tasks;
 
 namespace NeuralNetwork
 {
-    public class Matrix
-    {
-        private readonly double[][] _matrix;
+	public class Matrix
+	{
+		private Matrix(int rows, int cols)
+		{
+			value = new float[rows][];
+			for (var i = 0; i < rows; i++)
+				value[i] = new float[cols];
+		}
 
-        private Matrix(int rows, int cols)
-        {
-            _matrix = new double[rows][];
+		private Matrix(float[][] array) => value = array;
+		public float[][] value { get; }
 
-            for (var i = 0; i < rows; i++)
-            {
-                _matrix[i] = new double[cols];
-            }
-        }
 
-        private Matrix(double[][] array)
-        {
-            _matrix = array;
-        }
+		private static float[][] CreateJagged(int rows, int cols)
+		{
+			var jagged = new float[rows][];
+			for (var i = 0; i < rows; i++)
+				jagged[i] = new float[cols];
+			return jagged;
+		}
 
-        private static double[][] CreateJagged(int rows, int cols)
-        {
-            var jagged = new double[rows][];
+		public static Matrix Create(int rows, int cols) => new Matrix(rows, cols);
+		public static Matrix Create(float[][] array) => new Matrix(array);
 
-            for (var i = 0; i < rows; i++)
-            {
-                jagged[i] = new double[cols];
-            }
+		public void Initialize(Func<float> elementInitializer)
+		{
+			for (var x = 0; x < value.Length; x++)
+			for (var y = 0; y < value[x].Length; y++)
+				value[x][y] = elementInitializer();
+		}
 
-            return jagged;
-        }
+		public static Matrix operator -(Matrix a, Matrix b)
+		{
+			var newMatrix = CreateJagged(a.value.Length, b.value[0].Length);
+			for (var x = 0; x < a.value.Length; x++)
+			for (var y = 0; y < a.value[x].Length; y++)
+				newMatrix[x][y] = a.value[x][y] - b.value[x][y];
+			return Create(newMatrix);
+		}
 
-        public static Matrix Create(int rows, int cols)
-        {
-            return new Matrix(rows, cols);
-        }
+		public static Matrix operator +(Matrix a, Matrix b)
+		{
+			var newMatrix = CreateJagged(a.value.Length, b.value[0].Length);
+			for (var x = 0; x < a.value.Length; x++)
+			for (var y = 0; y < a.value[x].Length; y++)
+				newMatrix[x][y] = a.value[x][y] + b.value[x][y];
+			return Create(newMatrix);
+		}
 
-        public static Matrix Create(double[][] array)
-        {
-            return new Matrix(array);
-        }
+		public static Matrix operator +(Matrix a, float b)
+		{
+			for (var x = 0; x < a.value.Length; x++)
+			for (var y = 0; y < a.value[x].Length; y++)
+				a.value[x][y] = a.value[x][y] + b;
+			return a;
+		}
 
-        public void Initialize(Func<double> elementInitializer)
-        {
-            for (var x = 0; x < _matrix.Length; x++)
-            {
-                for (var y = 0; y < _matrix[x].Length; y++)
-                {
-                    _matrix[x][y] = elementInitializer();
-                }
-            }
-        }
+		public static Matrix operator -(float a, Matrix m)
+		{
+			for (var x = 0; x < m.value.Length; x++)
+			for (var y = 0; y < m.value[x].Length; y++)
+				m.value[x][y] = a - m.value[x][y];
+			return m;
+		}
 
-        public double[][] Value => _matrix;
+		public static Matrix operator *(Matrix a, Matrix b)
+		{
+			if (a.value.Length == b.value.Length && a.value[0].Length == b.value[0].Length)
+			{
+				var m = CreateJagged(a.value.Length, a.value[0].Length);
+				Parallel.For(0, a.value.Length, i =>
+				{
+					for (var j = 0; j < a.value[i].Length; j++)
+						m[i][j] = a.value[i][j] * b.value[i][j];
+				});
+				return Create(m);
+			}
 
-        public static Matrix operator -(Matrix a, Matrix b)
-        {
-            var newMatrix = CreateJagged(a.Value.Length, b.Value[0].Length);
+			var newMatrix = CreateJagged(a.value.Length, b.value[0].Length);
+			if (a.value[0].Length == b.value.Length)
+			{
+				Parallel.For(0, a.value.Length, i =>
+				{
+					for (var j = 0; j < b.value[0].Length; j++)
+					{
+						var temp = 0.0f;
+						for (var k = 0; k < a.value[0].Length; k++)
+							temp += a.value[i][k] * b.value[k][j];
+						newMatrix[i][j] = temp;
+					}
+				});
+			}
 
-            for (var x = 0; x < a.Value.Length; x++)
-            {
-                for (var y = 0; y < a.Value[x].Length; y++)
-                {
-                    newMatrix[x][y] = a.Value[x][y] - b.Value[x][y];
-                }
-            }
+			return Create(newMatrix);
+		}
 
-            return Create(newMatrix);
-        }
+		public static Matrix operator *(float scalar, Matrix b)
+		{
+			var newMatrix = CreateJagged(b.value.Length, b.value[0].Length);
+			for (var x = 0; x < b.value.Length; x++)
+			for (var y = 0; y < b.value[x].Length; y++)
+				newMatrix[x][y] = b.value[x][y] * scalar;
+			return Create(newMatrix);
+		}
 
-        public static Matrix operator +(Matrix a, Matrix b)
-        {
-            var newMatrix = CreateJagged(a.Value.Length, b.Value[0].Length);
-
-            for (var x = 0; x < a.Value.Length; x++)
-            {
-                for (var y = 0; y < a.Value[x].Length; y++)
-                {
-                    newMatrix[x][y] = a.Value[x][y] + b.Value[x][y];
-                }
-            }
-
-            return Create(newMatrix);
-        }
-
-        public static Matrix operator +(Matrix a, double b)
-        {
-            for (var x = 0; x < a.Value.Length; x++)
-            {
-                for (var y = 0; y < a.Value[x].Length; y++)
-                {
-                    a.Value[x][y] = a.Value[x][y] + b;
-                }
-            }
-
-            return a;
-        }
-
-        public static Matrix operator -(double a, Matrix m)
-        {
-            for (var x = 0; x < m.Value.Length; x++)
-            {
-                for (var y = 0; y < m.Value[x].Length; y++)
-                {
-                    m.Value[x][y] = a - m.Value[x][y];
-                }
-            }
-
-            return m;
-        }
-
-        public static Matrix operator *(Matrix a, Matrix b)
-        {
-            if (a.Value.Length == b.Value.Length && a.Value[0].Length == b.Value[0].Length)
-            {
-                var m = CreateJagged(a.Value.Length, a.Value[0].Length);
-
-                Parallel.For(0, a.Value.Length, i =>
-                {
-                    for (var j = 0; j < a.Value[i].Length; j++)
-                    {
-                        m[i][j] = a.Value[i][j] * b.Value[i][j];
-                    }
-                });
-
-                return Create(m);
-            }
-
-            var newMatrix = CreateJagged(a.Value.Length, b.Value[0].Length);
-
-            if (a.Value[0].Length == b.Value.Length)
-            {
-                var length = a.Value[0].Length;
-
-                Parallel.For(0, a.Value.Length, i =>
-                {
-                    for (var j = 0; j < b.Value[0].Length; j++)
-                    {
-                        var temp = 0.0;
-
-                        for (var k = 0; k < length; k++)
-                        {
-                            temp += a.Value[i][k] * b.Value[k][j];
-                        }
-
-                        newMatrix[i][j] = temp;
-                    }
-                });
-            }
-
-            return Create(newMatrix);
-        }
-
-        public static Matrix operator *(double scalar, Matrix b)
-        {
-            var newMatrix = CreateJagged(b.Value.Length, b.Value[0].Length);
-
-            for (var x = 0; x < b.Value.Length; x++)
-            {
-                for (var y = 0; y < b.Value[x].Length; y++)
-                {
-                    newMatrix[x][y] = b.Value[x][y] * scalar;
-                }
-            }
-
-            return Create(newMatrix);
-        }
-
-        public Matrix Transpose()
-        {
-            var rows = _matrix.Length;
-
-            var newMatrix = CreateJagged(_matrix[0].Length, rows); //rows --> cols, cols --> rows
-
-            for (var row = 0; row < rows; row++)
-            {
-                for (var col = 0; col < _matrix[row].Length; col++)
-                {
-                    newMatrix[col][row] = _matrix[row][col];
-                }
-            }
-
-            return Create(newMatrix);
-        }
-    }
+		public Matrix Transpose()
+		{
+			var rows = value.Length;
+			var newMatrix = CreateJagged(value[0].Length, rows);
+			for (var row = 0; row < rows; row++)
+			for (var col = 0; col < value[row].Length; col++)
+				newMatrix[col][row] = value[row][col];
+			return Create(newMatrix);
+		}
+	}
 }
